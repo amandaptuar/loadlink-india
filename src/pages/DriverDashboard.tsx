@@ -4,11 +4,11 @@ import { Truck, MapPin, IndianRupee, TrendingUp, Package } from "lucide-react";
 import Header from "@/components/Header";
 import BottomNav from "@/components/BottomNav";
 import LoadCard from "@/components/LoadCard";
-import { MOCK_LOADS } from "@/lib/types";
+import type { Load } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
 const DriverDashboard = () => {
-  const [loads, setLoads] = useState(MOCK_LOADS);
+  const [loads, setLoads] = useState<Load[]>([]);
   const { toast } = useToast();
 
   const handleAction = (loadId: string, action: string) => {
@@ -37,7 +37,7 @@ const DriverDashboard = () => {
       <div className="pt-20 px-4 max-w-lg mx-auto">
         {/* Greeting */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
-          <h1 className="text-2xl font-bold">Namaste, Rajesh 🙏</h1>
+          <h1 className="text-2xl font-bold">Namaste 🙏</h1>
           <p className="text-sm text-muted-foreground">Find loads near you (अपने पास के लोड खोजें)</p>
         </motion.div>
 
@@ -46,7 +46,7 @@ const DriverDashboard = () => {
           {[
             { icon: Package, label: "Active", labelHi: "चालू", value: myLoads.length, color: "text-electric" },
             { icon: TrendingUp, label: "Done", labelHi: "पूरे", value: delivered.length, color: "text-success" },
-            { icon: IndianRupee, label: "Earned", labelHi: "कमाई", value: "₹1.2L", color: "text-primary" },
+            { icon: IndianRupee, label: "Earned", labelHi: "कमाई", value: "₹0", color: "text-primary" },
           ].map((s) => (
             <div key={s.label} className="glass rounded-xl p-3 text-center">
               <s.icon className={`w-5 h-5 mx-auto mb-1 ${s.color}`} />

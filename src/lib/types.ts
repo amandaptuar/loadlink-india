@@ -63,30 +63,3 @@ export const STATUS_CONFIG: Record<LoadStatus, { label: string; labelHi: string;
   completed: { label: 'Completed', labelHi: 'पूरा हुआ', color: 'bg-status-completed' },
 };
 
-export const MOCK_LOADS: Load[] = [
-  {
-    id: '1', companyName: 'Tata Steel Ltd', pickupCity: 'Mumbai', pickupState: 'Maharashtra',
-    dropCity: 'Delhi', dropState: 'Delhi', material: 'Steel Coils', weight: 18,
-    truckType: 'Trailer', price: 85000, pickupDate: '28/02/2026', status: 'posted', distance: 1420,
-  },
-  {
-    id: '2', companyName: 'Reliance Industries', pickupCity: 'Surat', pickupState: 'Gujarat',
-    dropCity: 'Chennai', dropState: 'Tamil Nadu', material: 'Textiles', weight: 8,
-    truckType: 'Container', price: 62000, pickupDate: '01/03/2026', status: 'posted', distance: 1640,
-  },
-  {
-    id: '3', companyName: 'Ambuja Cements', pickupCity: 'Ahmedabad', pickupState: 'Gujarat',
-    dropCity: 'Pune', dropState: 'Maharashtra', material: 'Cement Bags', weight: 22,
-    truckType: 'Open Body', price: 45000, pickupDate: '02/03/2026', status: 'accepted', distance: 660,
-  },
-  {
-    id: '4', companyName: 'Hindustan Unilever', pickupCity: 'Bengaluru', pickupState: 'Karnataka',
-    dropCity: 'Hyderabad', dropState: 'Telangana', material: 'FMCG Products', weight: 6,
-    truckType: 'Container', price: 32000, pickupDate: '03/03/2026', status: 'in_transit', distance: 570,
-  },
-  {
-    id: '5', companyName: 'Mahindra Logistics', pickupCity: 'Jaipur', pickupState: 'Rajasthan',
-    dropCity: 'Lucknow', dropState: 'Uttar Pradesh', material: 'Auto Parts', weight: 10,
-    truckType: 'LCV', price: 28000, pickupDate: '25/02/2026', status: 'delivered', distance: 580,
-  },
-];

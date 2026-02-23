@@ -1,30 +1,96 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Truck, MapPin, IndianRupee, TrendingUp, Package } from "lucide-react";
 import Header from "@/components/Header";
 import BottomNav from "@/components/BottomNav";
 import LoadCard from "@/components/LoadCard";
-import type { Load } from "@/lib/types";
+import type { Load, LoadStatus } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const DriverDashboard = () => {
   const [loads, setLoads] = useState<Load[]>([]);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const handleAction = (loadId: string, action: string) => {
-    setLoads((prev) =>
-      prev.map((l) => {
-        if (l.id !== loadId) return l;
-        if (action === 'accept') return { ...l, status: 'accepted' as const };
-        if (action === 'start') return { ...l, status: 'in_transit' as const };
-        if (action === 'deliver') return { ...l, status: 'delivered' as const };
-        return l;
-      })
-    );
-    toast({
-      title: action === 'accept' ? "Load Accepted! ✅" : action === 'start' ? "Trip Started! 🚚" : "Delivered! 🎉",
-      description: action === 'accept' ? "लोड स्वीकार किया गया" : action === 'start' ? "यात्रा शुरू हो गई" : "माल पहुँचा दिया गया",
-    });
+  const fetchLoads = async () => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
+
+      const { data, error } = await supabase
+        .from('loads')
+        .select('*')
+        .or(`status.eq.posted,driver_id.eq.${userData.user.id}`);
+
+      if (error) throw error;
+
+      // Transform to match Load type if necessary
+      const transformedLoads: Load[] = (data || []).map((l: any) => ({
+        id: l.id,
+        companyName: "Loading...", // Will need another join if we want real company names
+        pickupCity: l.pickup_city,
+        pickupState: l.pickup_state,
+        dropCity: l.drop_city,
+        dropState: l.drop_state,
+        material: l.material,
+        weight: l.weight,
+        truckType: l.truck_type,
+        price: l.price,
+        pickupDate: l.pickup_date,
+        status: l.status as LoadStatus,
+      }));
+
+      setLoads(transformedLoads);
+    } catch (error: any) {
+      toast({
+        title: "Error fetching loads",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLoads();
+  }, []);
+
+  const handleAction = async (loadId: string, action: string) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Not authenticated");
+
+      let updates: any = {};
+      if (action === 'accept') {
+        updates = { status: 'accepted', driver_id: userData.user.id };
+      } else if (action === 'start') {
+        updates = { status: 'in_transit' };
+      } else if (action === 'deliver') {
+        updates = { status: 'delivered' };
+      }
+
+      const { error } = await supabase
+        .from('loads')
+        .update(updates)
+        .eq('id', loadId);
+
+      if (error) throw error;
+
+      toast({
+        title: action === 'accept' ? "Load Accepted! ✅" : action === 'start' ? "Trip Started! 🚚" : "Delivered! 🎉",
+        description: action === 'accept' ? "लोड स्वीकार किया गया" : action === 'start' ? "यात्रा शुरू हो गई" : "माल पहुँचा दिया गया",
+      });
+
+      fetchLoads(); // Refresh list
+    } catch (error: any) {
+      toast({
+        title: "Action failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const available = loads.filter((l) => l.status === 'posted');
@@ -46,7 +112,7 @@ const DriverDashboard = () => {
           {[
             { icon: Package, label: "Active", labelHi: "चालू", value: myLoads.length, color: "text-electric" },
             { icon: TrendingUp, label: "Done", labelHi: "पूरे", value: delivered.length, color: "text-success" },
-            { icon: IndianRupee, label: "Earned", labelHi: "कमाई", value: "₹0", color: "text-primary" },
+            { icon: IndianRupee, label: "Earned", labelHi: "कमाई", value: `₹${delivered.reduce((acc, l) => acc + (l.price || 0), 0).toLocaleString()}`, color: "text-primary" },
           ].map((s) => (
             <div key={s.label} className="glass rounded-xl p-3 text-center">
               <s.icon className={`w-5 h-5 mx-auto mb-1 ${s.color}`} />
@@ -74,7 +140,11 @@ const DriverDashboard = () => {
             Available Loads (उपलब्ध लोड)
             <span className="ml-2 text-sm text-muted-foreground font-normal">({available.length})</span>
           </h2>
-          {available.length === 0 ? (
+          {loading ? (
+            <div className="glass rounded-2xl p-8 text-center animate-pulse">
+              <p className="text-muted-foreground">Loading loads...</p>
+            </div>
+          ) : available.length === 0 ? (
             <div className="glass rounded-2xl p-8 text-center">
               <Truck className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
               <p className="text-muted-foreground">No loads available right now</p>

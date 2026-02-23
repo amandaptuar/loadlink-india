@@ -1,14 +1,56 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Plus, Package, Truck, IndianRupee, TrendingUp, MapPin, ArrowRight } from "lucide-react";
 import Header from "@/components/Header";
 import LoadCard from "@/components/LoadCard";
 import StatusTimeline from "@/components/StatusTimeline";
-import type { Load } from "@/lib/types";
+import type { Load, LoadStatus } from "@/lib/types";
+import { supabase } from "@/integrations/supabase/client";
 
 const CompanyDashboard = () => {
-  const [loads] = useState<Load[]>([]);
+  const [loads, setLoads] = useState<Load[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchCompanyLoads = async () => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
+
+      const { data, error } = await supabase
+        .from('loads')
+        .select('*')
+        .eq('company_id', userData.user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const transformedLoads: Load[] = (data || []).map((l: any) => ({
+        id: l.id,
+        companyName: "Me",
+        pickupCity: l.pickup_city,
+        pickupState: l.pickup_state,
+        dropCity: l.drop_city,
+        dropState: l.drop_state,
+        material: l.material,
+        weight: l.weight,
+        truckType: l.truck_type,
+        price: l.price,
+        pickupDate: l.pickup_date,
+        status: l.status as LoadStatus,
+      }));
+
+      setLoads(transformedLoads);
+    } catch (error: any) {
+      console.error("Error fetching company loads:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCompanyLoads();
+  }, []);
 
   const active = loads.filter((l) => !['delivered', 'completed'].includes(l.status));
   const completed = loads.filter((l) => ['delivered', 'completed'].includes(l.status));
@@ -59,14 +101,28 @@ const CompanyDashboard = () => {
         {/* Active loads */}
         <section className="mb-8">
           <h2 className="text-lg font-bold mb-4">Active Loads (चालू लोड)</h2>
-          <div className="grid md:grid-cols-2 gap-4">
-            {active.map((l) => (
-              <div key={l.id} className="space-y-3">
-                <LoadCard load={l} role="company" />
-                <StatusTimeline current={l.status} />
-              </div>
-            ))}
-          </div>
+          {loading ? (
+            <div className="glass rounded-2xl p-8 text-center animate-pulse">
+              <p className="text-muted-foreground">Loading loads...</p>
+            </div>
+          ) : active.length === 0 ? (
+            <div className="glass rounded-2xl p-8 text-center">
+              <Package className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">No active loads</p>
+              <Link to="/company/post-load" className="text-primary hover:underline font-medium block mt-2">
+                Post your first load (अपना पहला लोड पोस्ट करें)
+              </Link>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 gap-4">
+              {active.map((l) => (
+                <div key={l.id} className="space-y-3">
+                  <LoadCard load={l} role="company" />
+                  <StatusTimeline current={l.status} />
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* Completed */}

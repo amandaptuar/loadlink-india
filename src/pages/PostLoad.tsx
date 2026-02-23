@@ -6,6 +6,8 @@ import Header from "@/components/Header";
 import { TRUCK_TYPES, INDIAN_STATES, MAJOR_CITIES } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
+import { supabase } from "@/integrations/supabase/client";
+
 const STEPS = [
   { icon: MapPin, label: "Pickup City", labelHi: "लोडिंग जगह" },
   { icon: MapPin, label: "Drop City", labelHi: "उतराई जगह" },
@@ -18,6 +20,7 @@ const STEPS = [
 
 const PostLoad = () => {
   const [step, setStep] = useState(0);
+  const [loading, setLoading] = useState(false);
   const [data, setData] = useState({
     pickupState: '', pickupCity: '', dropState: '', dropCity: '',
     material: '', weight: '', truckType: '', price: '', pickupDate: '',
@@ -27,11 +30,41 @@ const PostLoad = () => {
 
   const update = (key: string, value: string) => setData((d) => ({ ...d, [key]: value }));
 
-  const next = () => {
+  const next = async () => {
     if (step < STEPS.length - 1) setStep(step + 1);
     else {
-      toast({ title: "Load Posted! ✅", description: "Your load is now visible to drivers (आपका लोड ड्राइवरों को दिख रहा है)" });
-      navigate("/company");
+      setLoading(true);
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        if (!userData.user) throw new Error("User not authenticated");
+
+        const { error } = await supabase.from('loads').insert({
+          company_id: userData.user.id,
+          pickup_city: data.pickupCity,
+          pickup_state: data.pickupState,
+          drop_city: data.dropCity,
+          drop_state: data.dropState,
+          material: data.material,
+          weight: parseFloat(data.weight),
+          truck_type: data.truckType,
+          price: parseFloat(data.price),
+          pickup_date: data.pickupDate || null,
+          status: 'posted'
+        });
+
+        if (error) throw error;
+
+        toast({ title: "Load Posted! ✅", description: "Your load is now visible to drivers (आपका लोड ड्राइवरों को दिख रहा है)" });
+        navigate("/company");
+      } catch (error: any) {
+        toast({
+          title: "Failed to post load ❌",
+          description: error.message || "Something went wrong",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
     }
   };
   const back = () => step > 0 && setStep(step - 1);
@@ -110,9 +143,8 @@ const PostLoad = () => {
                   <button
                     key={t}
                     onClick={() => update('truckType', t)}
-                    className={`py-3 px-3 rounded-xl text-sm font-medium transition-all ${
-                      data.truckType === t ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                    }`}
+                    className={`py-3 px-3 rounded-xl text-sm font-medium transition-all ${data.truckType === t ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      }`}
                   >
                     {t}
                   </button>
@@ -145,19 +177,25 @@ const PostLoad = () => {
         {/* Navigation */}
         <div className="flex gap-3 mt-6">
           {step > 0 && (
-            <button onClick={back} className="btn-glass py-3 px-5 rounded-xl flex items-center gap-2">
+            <button onClick={back} disabled={loading} className="btn-glass py-3 px-5 rounded-xl flex items-center gap-2 disabled:opacity-50">
               <ArrowLeft className="w-4 h-4" /> Back
             </button>
           )}
-          <button onClick={next} className="flex-1 btn-gold py-3.5 rounded-xl flex items-center justify-center gap-2 text-lg">
-            {step === STEPS.length - 1 ? (
-              <>
-                <Check className="w-5 h-5" /> Post Load (लोड पोस्ट करें)
-              </>
-            ) : (
-              <>
-                Next <ArrowRight className="w-5 h-5" />
-              </>
+          <button
+            onClick={next}
+            disabled={loading}
+            className="flex-1 btn-gold py-3.5 rounded-xl flex items-center justify-center gap-2 text-lg disabled:opacity-50"
+          >
+            {loading ? "Posting..." : (
+              step === STEPS.length - 1 ? (
+                <>
+                  <Check className="w-5 h-5" /> Post Load (लोड पोस्ट करें)
+                </>
+              ) : (
+                <>
+                  Next <ArrowRight className="w-5 h-5" />
+                </>
+              )
             )}
           </button>
         </div>

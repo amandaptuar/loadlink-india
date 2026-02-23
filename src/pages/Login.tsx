@@ -2,16 +2,64 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Truck, Phone, Mail, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const Login = () => {
   const [method, setMethod] = useState<'phone' | 'email'>('phone');
   const [showPass, setShowPass] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Demo: navigate to driver dashboard
-    navigate("/driver");
+    setLoading(true);
+
+    try {
+      if (method === 'email') {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) throw error;
+
+        // Fetch user profile to redirect correctly
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .single();
+
+        toast({
+          title: "Welcome Back! 👋",
+          description: "Login successful (लॉगिन सफल रहा)",
+        });
+
+        if (profile?.role === 'admin') navigate("/admin");
+        else if (profile?.role === 'company') navigate("/company");
+        else navigate("/driver");
+      } else {
+        // Phone login - for now just simulated or use OTP
+        toast({
+          title: "Coming Soon! 🚀",
+          description: "Phone login with OTP will be available soon. Please use Email for now.",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Login Failed ❌",
+        description: error.message || "Invalid credentials",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -39,18 +87,16 @@ const Login = () => {
           <div className="flex gap-2 mb-6">
             <button
               onClick={() => setMethod('phone')}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                method === 'phone' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-              }`}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${method === 'phone' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                }`}
             >
               <Phone className="w-4 h-4 inline mr-1.5" />
               Phone (फ़ोन)
             </button>
             <button
               onClick={() => setMethod('email')}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                method === 'email' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-              }`}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${method === 'email' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                }`}
             >
               <Mail className="w-4 h-4 inline mr-1.5" />
               Email
@@ -72,13 +118,19 @@ const Login = () => {
                       type="tel"
                       placeholder="98765 43210"
                       maxLength={10}
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
                       className="flex-1 bg-muted rounded-r-xl px-4 py-3 text-lg outline-none focus:ring-2 ring-primary/50 transition-all"
                     />
                   </div>
                 </div>
-                <button type="submit" className="w-full btn-gold text-lg py-4 rounded-xl">
-                  Send OTP (OTP भेजें)
-                  <ArrowRight className="inline ml-2 w-5 h-5" />
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full btn-gold text-lg py-4 rounded-xl disabled:opacity-50"
+                >
+                  {loading ? "Sending..." : "Send OTP (OTP भेजें)"}
+                  {!loading && <ArrowRight className="inline ml-2 w-5 h-5" />}
                 </button>
               </>
             ) : (
@@ -88,6 +140,9 @@ const Login = () => {
                   <input
                     type="email"
                     placeholder="you@company.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
                     className="w-full bg-muted rounded-xl px-4 py-3 outline-none focus:ring-2 ring-primary/50 transition-all"
                   />
                 </div>
@@ -99,6 +154,9 @@ const Login = () => {
                     <input
                       type={showPass ? "text" : "password"}
                       placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
                       className="w-full bg-muted rounded-xl px-4 py-3 pr-10 outline-none focus:ring-2 ring-primary/50 transition-all"
                     />
                     <button
@@ -110,9 +168,13 @@ const Login = () => {
                     </button>
                   </div>
                 </div>
-                <button type="submit" className="w-full btn-gold text-lg py-4 rounded-xl">
-                  Login (लॉगिन करें)
-                  <ArrowRight className="inline ml-2 w-5 h-5" />
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full btn-gold text-lg py-4 rounded-xl disabled:opacity-50"
+                >
+                  {loading ? "Logging in..." : "Login (लॉगिन करें)"}
+                  {!loading && <ArrowRight className="inline ml-2 w-5 h-5" />}
                 </button>
               </>
             )}

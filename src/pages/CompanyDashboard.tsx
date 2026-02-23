@@ -5,10 +5,10 @@ import { Plus, Package, Truck, IndianRupee, TrendingUp, MapPin, ArrowRight } fro
 import Header from "@/components/Header";
 import LoadCard from "@/components/LoadCard";
 import StatusTimeline from "@/components/StatusTimeline";
-import { MOCK_LOADS } from "@/lib/types";
+import type { Load } from "@/lib/types";
 
 const CompanyDashboard = () => {
-  const [loads] = useState(MOCK_LOADS);
+  const [loads] = useState<Load[]>([]);
 
   const active = loads.filter((l) => !['delivered', 'completed'].includes(l.status));
   const completed = loads.filter((l) => ['delivered', 'completed'].includes(l.status));
@@ -21,7 +21,7 @@ const CompanyDashboard = () => {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold">Dashboard (डैशबोर्ड)</h1>
-            <p className="text-sm text-muted-foreground">Tata Steel Ltd</p>
+            <p className="text-sm text-muted-foreground">Your Company</p>
           </div>
           <Link to="/company/post-load" className="btn-gold flex items-center gap-2 py-2.5 px-5">
             <Plus className="w-5 h-5" />
@@ -33,8 +33,8 @@ const CompanyDashboard = () => {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
           {[
             { icon: Package, label: "Active Loads", labelHi: "चालू लोड", value: active.length, color: "text-electric" },
-            { icon: Truck, label: "Trucks Assigned", labelHi: "ट्रक लगे", value: 3, color: "text-success" },
-            { icon: IndianRupee, label: "Total Spent", labelHi: "कुल खर्च", value: "₹2.5L", color: "text-primary" },
+            { icon: Truck, label: "Trucks Assigned", labelHi: "ट्रक लगे", value: 0, color: "text-success" },
+            { icon: IndianRupee, label: "Total Spent", labelHi: "कुल खर्च", value: "₹0", color: "text-primary" },
             { icon: TrendingUp, label: "Completed", labelHi: "पूरे हुए", value: completed.length, color: "text-gold-dim" },
           ].map((s) => (
             <motion.div

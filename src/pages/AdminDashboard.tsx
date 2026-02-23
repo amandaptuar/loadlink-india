@@ -3,15 +3,18 @@ import { motion } from "framer-motion";
 import { Users, Truck, Package, IndianRupee, CheckCircle, XCircle, Shield, Eye } from "lucide-react";
 import Header from "@/components/Header";
 
-const mockDrivers = [
-  { id: '1', name: 'Rajesh Kumar', phone: '9876543210', truck: 'MH 12 AB 1234', type: 'Trailer', city: 'Mumbai', verified: true },
-  { id: '2', name: 'Suresh Singh', phone: '9876543211', truck: 'DL 01 CD 5678', type: 'Container', city: 'Delhi', verified: false },
-  { id: '3', name: 'Amit Patel', phone: '9876543212', truck: 'GJ 05 EF 9012', type: 'Open Body', city: 'Ahmedabad', verified: true },
-  { id: '4', name: 'Vikram Yadav', phone: '9876543213', truck: 'RJ 14 GH 3456', type: 'Tanker', city: 'Jaipur', verified: false },
-];
+interface Driver {
+  id: string;
+  name: string;
+  phone: string;
+  truck: string;
+  type: string;
+  city: string;
+  verified: boolean;
+}
 
 const AdminDashboard = () => {
-  const [drivers, setDrivers] = useState(mockDrivers);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
 
   const toggleVerify = (id: string) => {
     setDrivers((prev) => prev.map((d) => d.id === id ? { ...d, verified: !d.verified } : d));
@@ -26,10 +29,10 @@ const AdminDashboard = () => {
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
           {[
-            { icon: Users, label: "Total Users", value: "12,450", color: "text-electric" },
-            { icon: Truck, label: "Drivers", value: "8,200", color: "text-success" },
-            { icon: Package, label: "Active Loads", value: "340", color: "text-warning" },
-            { icon: IndianRupee, label: "Revenue", value: "₹4.2 Cr", color: "text-primary" },
+            { icon: Users, label: "Total Users", value: "0", color: "text-electric" },
+            { icon: Truck, label: "Drivers", value: "0", color: "text-success" },
+            { icon: Package, label: "Active Loads", value: "0", color: "text-warning" },
+            { icon: IndianRupee, label: "Revenue", value: "₹0", color: "text-primary" },
           ].map((s) => (
             <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-xl p-4">
               <s.icon className={`w-5 h-5 mb-2 ${s.color}`} />

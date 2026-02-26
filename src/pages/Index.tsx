@@ -49,14 +49,14 @@ const Index = () => {
               <span className="text-muted-foreground">India's #1 Freight Marketplace</span>
             </div>
             <h1 className="text-4xl sm:text-5xl lg:text-7xl font-extrabold leading-[1.1] mb-6">
-              <span className="text-gradient-gold">Smart Freight</span>
+              <span className="text-gradient-gold">Ab Trucking</span>
               <br />
-              Movement for
+              Hogi
               <br />
-              <span className="text-gradient-blue">Bharat</span>
+              <span className="text-gradient-blue">Bez-Misal!</span>
             </h1>
             <p className="text-lg sm:text-xl text-muted-foreground max-w-xl mb-8">
-              Connect with verified truck drivers across India. Post loads, track shipments, and pay securely — all in one platform.
+              Maal dhone ka naya tareeka - TruckBez ek "Tata Ace" ya "Mahindra Bolero Pickup" ki photo zaroor lagana, Isse log turant connect kar payenge ki ye unke roz-marra ke business ke liye hai.
               <br />
               <span className="text-sm">(भारत का सबसे भरोसेमंद फ्रेट प्लेटफॉर्म)</span>
             </p>
@@ -99,7 +99,7 @@ const Index = () => {
         <div className="container mx-auto px-4">
           <div className="text-center mb-14">
             <h2 className="text-3xl sm:text-4xl font-bold mb-3">
-              Why Choose <span className="text-gradient-gold">LOADLINK</span>?
+              Why Choose <span className="text-gradient-gold">Truckbez</span>?
             </h2>
             <p className="text-muted-foreground">Everything you need for freight movement (माल ढुलाई के लिए सबकुछ)</p>
           </div>
@@ -187,7 +187,7 @@ const Index = () => {
         <div className="container mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <Truck className="w-5 h-5 text-primary" />
-            <span className="font-bold text-foreground">LOADLINK</span>
+            <span className="font-bold text-foreground">Truckbez</span>
             <span>© 2026</span>
           </div>
           <p>Smart Freight Movement Platform for India</p>

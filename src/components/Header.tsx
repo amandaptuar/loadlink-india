@@ -16,8 +16,8 @@ const Header = () => {
             <Truck className="w-5 h-5 text-primary-foreground" />
           </div>
           <span className="text-xl font-bold tracking-tight">
-            <span className="text-gradient-gold">LOAD</span>
-            <span className="text-foreground">LINK</span>
+            <span className="text-gradient-gold">Truck</span>
+            <span className="text-foreground">bez</span>
           </span>
         </Link>
 

@@ -95,7 +95,7 @@ const Register = () => {
             <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
               <Truck className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold"><span className="text-gradient-gold">LOAD</span>LINK</span>
+            <span className="text-xl font-bold"><span className="text-gradient-gold">Truck</span>bez</span>
           </Link>
           <h1 className="text-2xl font-bold">Create Account (खाता बनाएं)</h1>
         </div>

@@ -56,7 +56,7 @@ const Index = () => {
               <span className="text-gradient-blue">Bez-Misal!</span>
             </h1>
             <p className="text-lg sm:text-xl text-muted-foreground max-w-xl mb-8">
-              Maal dhone ka naya tareeka - TruckBez ek "Tata Ace" ya "Mahindra Bolero Pickup" ki photo zaroor lagana, Isse log turant connect kar payenge ki ye unke roz-marra ke business ke liye hai.
+             Kuchh bhi bhejo kahi bhi. Aapka saaman hamari technology
               <br />
               <span className="text-sm">(भारत का सबसे भरोसेमंद फ्रेट प्लेटफॉर्म)</span>
             </p>
@@ -163,7 +163,7 @@ const Index = () => {
             className="glass rounded-3xl p-8 sm:p-14 glow-gold max-w-3xl mx-auto"
           >
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              Start Moving Freight <span className="text-gradient-gold">Today</span>
+              Maal dhone ka naya tareeka -<span className="text-gradient-gold">TruckBez</span><span>🛻</span>
             </h2>
             <p className="text-muted-foreground mb-8">
               Join thousands of companies and drivers across India.

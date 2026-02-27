@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 
 import { supabase } from "@/integrations/supabase/client";
 
+
 const STEPS = [
   { icon: MapPin, label: "Pickup City", labelHi: "लोडिंग जगह" },
   { icon: MapPin, label: "Drop City", labelHi: "उतराई जगह" },

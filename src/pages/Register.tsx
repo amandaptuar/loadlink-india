@@ -1,16 +1,21 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Truck, Building2, User, ArrowRight, ArrowLeft } from "lucide-react";
+import { Truck, Building2, User, ArrowRight } from "lucide-react";
 import { TRUCK_TYPES, INDIAN_STATES } from "@/lib/types";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-type Role = 'company' | 'driver';
+import { app } from "@/Firebase";
+import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import { getFirestore, doc, setDoc } from "firebase/firestore";
+
+type Role = "company" | "driver";
 
 const Register = () => {
   const [params] = useSearchParams();
-  const [role, setRole] = useState<Role>((params.get('role') as Role) || 'driver');
+  const [role, setRole] = useState<Role>(
+    (params.get("role") as Role) || "driver"
+  );
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
@@ -26,6 +31,7 @@ const Register = () => {
   const [gstNumber, setGstNumber] = useState("");
   const [address, setAddress] = useState("");
   const [loading, setLoading] = useState(false);
+
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,45 +39,52 @@ const Register = () => {
     setLoading(true);
 
     try {
-      // 1. Sign up user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+
+      // 🔐 Create Auth user
+      const cred = await createUserWithEmailAndPassword(
+        auth,
         email,
-        password,
-        options: {
-          data: {
-            role,
-          }
-        }
+        password
+      );
+
+      const uid = cred.user.uid;
+
+      // 👤 Common profile
+      const baseProfile = {
+        uid,
+        role,
+        email,
+        phone,
+        state,
+        city,
+        created_at: new Date(),
+      };
+
+      if (role === "driver") {
+        await setDoc(doc(db, "drivers", uid), {
+          ...baseProfile,
+          fullName,
+          licenseNumber,
+          truckNumber,
+          truckType,
+        });
+      } else {
+        await setDoc(doc(db, "companies", uid), {
+          ...baseProfile,
+          companyName,
+          gstNumber,
+          address,
+        });
+      }
+
+      toast({
+        title: "Registration Successful! 🎉",
+        description: "Welcome to Truckbez (Truckbez में आपका स्वागत है)",
       });
 
-      if (authError) throw authError;
-
-      if (authData.user) {
-        // 2. Create profile
-        const profileData = {
-          id: authData.user.id,
-          name: fullName || companyName,
-          phone,
-          role,
-          company_name: companyName,
-          gst_number: gstNumber,
-          license_number: licenseNumber,
-          truck_number: truckNumber,
-          truck_type: truckType,
-          state,
-          city,
-        };
-
-        const { error: profileError } = await supabase.from('profiles').insert(profileData);
-        if (profileError) throw profileError;
-
-        toast({
-          title: "Registration Successful! 🎉",
-          description: "Welcome to LoadLink (LoadLink में आपका स्वागत है)",
-        });
-
-        navigate(role === 'driver' ? '/driver' : '/company');
-      }
+      navigate(role === "driver" ? "/driver" : "/company");
     } catch (error: any) {
       toast({
         title: "Registration Failed ❌",
@@ -95,62 +108,168 @@ const Register = () => {
             <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
               <Truck className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold"><span className="text-gradient-gold">Truck</span>bez</span>
+            <span className="text-xl font-bold">
+              <span className="text-gradient-gold">Truck</span>bez
+            </span>
           </Link>
-          <h1 className="text-2xl font-bold">Create Account (खाता बनाएं)</h1>
+          <h1 className="text-2xl font-bold">
+            Create Account (खाता बनाएं)
+          </h1>
         </div>
 
         {/* Role toggle */}
         <div className="flex gap-2 mb-6">
           <button
             type="button"
-            onClick={() => setRole('company')}
-            className={`flex-1 py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${role === 'company' ? 'bg-primary text-primary-foreground' : 'glass'
-              }`}
+            onClick={() => setRole("company")}
+            className={`flex-1 py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${
+              role === "company"
+                ? "bg-primary text-primary-foreground"
+                : "glass"
+            }`}
           >
             <Building2 className="w-5 h-5" />
             Company (कंपनी)
           </button>
+
           <button
             type="button"
-            onClick={() => setRole('driver')}
-            className={`flex-1 py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${role === 'driver' ? 'bg-primary text-primary-foreground' : 'glass'
-              }`}
+            onClick={() => setRole("driver")}
+            className={`flex-1 py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${
+              role === "driver"
+                ? "bg-primary text-primary-foreground"
+                : "glass"
+            }`}
           >
             <User className="w-5 h-5" />
             Driver (ड्राइवर)
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="glass rounded-2xl p-6 space-y-4">
-          <InputField label="Email" placeholder="you@example.com" type="email" value={email} onChange={setEmail} required />
-          <InputField label="Password (पासवर्ड)" placeholder="••••••••" type="password" value={password} onChange={setPassword} required />
+        <form
+          onSubmit={handleSubmit}
+          className="glass rounded-2xl p-6 space-y-4"
+        >
+          <InputField
+            label="Email"
+            placeholder="you@example.com"
+            type="email"
+            value={email}
+            onChange={setEmail}
+            required
+          />
 
-          {role === 'driver' ? (
+          <InputField
+            label="Password (पासवर्ड)"
+            placeholder="••••••••"
+            type="password"
+            value={password}
+            onChange={setPassword}
+            required
+          />
+
+          {role === "driver" ? (
             <>
-              <InputField label="Full Name (पूरा नाम)" placeholder="राजेश कुमार" value={fullName} onChange={setFullName} required />
+              <InputField
+                label="Full Name (पूरा नाम)"
+                placeholder="राजेश कुमार"
+                value={fullName}
+                onChange={setFullName}
+                required
+              />
+
               <PhoneField value={phone} onChange={setPhone} required />
-              <InputField label="License Number (लाइसेंस नंबर)" placeholder="DL-0420110012345" value={licenseNumber} onChange={setLicenseNumber} required />
-              <InputField label="Truck Number (ट्रक नंबर)" placeholder="MH 12 AB 1234" value={truckNumber} onChange={setTruckNumber} required />
-              <SelectField label="Truck Type (ट्रक का प्रकार)" options={TRUCK_TYPES as unknown as string[]} value={truckType} onChange={setTruckType} required />
-              <SelectField label="State (राज्य)" options={INDIAN_STATES as unknown as string[]} value={state} onChange={setState} required />
-              <InputField label="City (शहर)" placeholder="Mumbai" value={city} onChange={setCity} required />
+
+              <InputField
+                label="License Number (लाइसेंस नंबर)"
+                placeholder="DL-0420110012345"
+                value={licenseNumber}
+                onChange={setLicenseNumber}
+                required
+              />
+
+              <InputField
+                label="Truck Number (ट्रक नंबर)"
+                placeholder="MH 12 AB 1234"
+                value={truckNumber}
+                onChange={setTruckNumber}
+                required
+              />
+
+              <SelectField
+                label="Truck Type (ट्रक का प्रकार)"
+                options={TRUCK_TYPES as unknown as string[]}
+                value={truckType}
+                onChange={setTruckType}
+                required
+              />
+
+              <SelectField
+                label="State (राज्य)"
+                options={INDIAN_STATES as unknown as string[]}
+                value={state}
+                onChange={setState}
+                required
+              />
+
+              <InputField
+                label="City (शहर)"
+                placeholder="Mumbai"
+                value={city}
+                onChange={setCity}
+                required
+              />
             </>
           ) : (
             <>
-              <InputField label="Company Name (कंपनी का नाम)" placeholder="ABC Logistics Pvt Ltd" value={companyName} onChange={setCompanyName} required />
-              <InputField label="GST Number (GST नंबर)" placeholder="22AAAAA0000A1Z5" value={gstNumber} onChange={setGstNumber} required />
+              <InputField
+                label="Company Name (कंपनी का नाम)"
+                placeholder="ABC Logistics Pvt Ltd"
+                value={companyName}
+                onChange={setCompanyName}
+                required
+              />
+
+              <InputField
+                label="GST Number (GST नंबर)"
+                placeholder="22AAAAA0000A1Z5"
+                value={gstNumber}
+                onChange={setGstNumber}
+                required
+              />
+
               <PhoneField value={phone} onChange={setPhone} required />
-              <InputField label="Address (पता)" placeholder="123, Industrial Area" value={address} onChange={setAddress} required />
-              <SelectField label="State (राज्य)" options={INDIAN_STATES as unknown as string[]} value={state} onChange={setState} required />
-              <InputField label="City (शहर)" placeholder="Mumbai" value={city} onChange={setCity} required />
+
+              <InputField
+                label="Address (पता)"
+                placeholder="123, Industrial Area"
+                value={address}
+                onChange={setAddress}
+                required
+              />
+
+              <SelectField
+                label="State (राज्य)"
+                options={INDIAN_STATES as unknown as string[]}
+                value={state}
+                onChange={setState}
+                required
+              />
+
+              <InputField
+                label="City (शहर)"
+                placeholder="Mumbai"
+                value={city}
+                onChange={setCity}
+                required
+              />
             </>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full btn-gold text-lg py-4 rounded-xl mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full btn-gold text-lg py-4 rounded-xl mt-2 disabled:opacity-50"
           >
             {loading ? "Registering..." : "Register (रजिस्टर करें)"}
             {!loading && <ArrowRight className="inline ml-2 w-5 h-5" />}
@@ -159,59 +278,79 @@ const Register = () => {
 
         <p className="text-center text-sm text-muted-foreground mt-6">
           Already have an account?{" "}
-          <Link to="/login" className="text-primary font-medium hover:underline">Login</Link>
+          <Link
+            to="/login"
+            className="text-primary font-medium hover:underline"
+          >
+            Login
+          </Link>
         </p>
       </motion.div>
     </div>
   );
 };
 
-const InputField = ({ label, placeholder, type = "text", value, onChange, required }: { label: string; placeholder: string; type?: string; value: string; onChange: (v: string) => void; required?: boolean }) => (
+const InputField = ({
+  label,
+  placeholder,
+  type = "text",
+  value,
+  onChange,
+  required,
+}: any) => (
   <div>
-    <label className="text-sm font-medium mb-1.5 block">{label}</label>
+    <label className="text-sm font-medium mb-1.5 block">
+      {label}
+    </label>
     <input
       type={type}
       placeholder={placeholder}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       required={required}
-      className="w-full bg-muted rounded-xl px-4 py-3 outline-none focus:ring-2 ring-primary/50 transition-all"
+      className="w-full bg-muted rounded-xl px-4 py-3 outline-none focus:ring-2 ring-primary/50"
     />
   </div>
 );
 
-const PhoneField = ({ value, onChange, required }: { value: string; onChange: (v: string) => void; required?: boolean }) => (
+const PhoneField = ({ value, onChange, required }: any) => (
   <div>
-    <label className="text-sm font-medium mb-1.5 block">Phone Number (फ़ोन नंबर)</label>
+    <label className="text-sm font-medium mb-1.5 block">
+      Phone Number (फ़ोन नंबर)
+    </label>
     <div className="flex">
       <span className="flex items-center px-3 bg-muted rounded-l-xl border-r border-border text-sm text-muted-foreground">
         +91
       </span>
       <input
         type="tel"
-        placeholder="98765 43210"
+        placeholder="9876543210"
         maxLength={10}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         required={required}
-        className="flex-1 bg-muted rounded-r-xl px-4 py-3 text-lg outline-none focus:ring-2 ring-primary/50 transition-all"
+        className="flex-1 bg-muted rounded-r-xl px-4 py-3 outline-none focus:ring-2 ring-primary/50"
       />
     </div>
   </div>
 );
 
-const SelectField = ({ label, options, value, onChange, required }: { label: string; options: string[]; value: string; onChange: (v: string) => void; required?: boolean }) => (
+const SelectField = ({ label, options, value, onChange, required }: any) => (
   <div>
-    <label className="text-sm font-medium mb-1.5 block">{label}</label>
+    <label className="text-sm font-medium mb-1.5 block">
+      {label}
+    </label>
     <select
-      className="w-full bg-muted rounded-xl px-4 py-3 outline-none focus:ring-2 ring-primary/50 transition-all appearance-none"
+      className="w-full bg-muted rounded-xl px-4 py-3 outline-none focus:ring-2 ring-primary/50"
       value={value}
       onChange={(e) => onChange(e.target.value)}
       required={required}
     >
       <option value="">Select...</option>
-      {options.map((o) => (
-        <option key={o} value={o}>{o}</option>
+      {options.map((o: string) => (
+        <option key={o} value={o}>
+          {o}
+        </option>
       ))}
     </select>
   </div>

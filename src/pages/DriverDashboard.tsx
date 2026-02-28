@@ -1,12 +1,23 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Truck, MapPin, IndianRupee, TrendingUp, Package } from "lucide-react";
+import { Truck, IndianRupee, TrendingUp, Package } from "lucide-react";
 import Header from "@/components/Header";
 import BottomNav from "@/components/BottomNav";
 import LoadCard from "@/components/LoadCard";
 import type { Load, LoadStatus } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+
+import { app } from "@/Firebase";
+import { getAuth } from "firebase/auth";
+import {
+  getFirestore,
+  collection,
+  getDocs,
+  query,
+  where,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
 
 const DriverDashboard = () => {
   const [loads, setLoads] = useState<Load[]>([]);
@@ -15,33 +26,54 @@ const DriverDashboard = () => {
 
   const fetchLoads = async () => {
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return;
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+      const user = auth.currentUser;
+      if (!user) return;
 
-      const { data, error } = await supabase
-        .from('loads')
-        .select('*')
-        .or(`status.eq.posted,driver_id.eq.${userData.user.id}`);
+      // 🔎 Get posted loads
+      const postedQuery = query(
+        collection(db, "loads"),
+        where("status", "==", "posted")
+      );
 
-      if (error) throw error;
+      // 🔎 Get driver loads
+      const myQuery = query(
+        collection(db, "loads"),
+        where("driver_id", "==", user.uid)
+      );
 
-      // Transform to match Load type if necessary
-      const transformedLoads: Load[] = (data || []).map((l: any) => ({
-        id: l.id,
-        companyName: "Loading...", // Will need another join if we want real company names
-        pickupCity: l.pickup_city,
-        pickupState: l.pickup_state,
-        dropCity: l.drop_city,
-        dropState: l.drop_state,
-        material: l.material,
-        weight: l.weight,
-        truckType: l.truck_type,
-        price: l.price,
-        pickupDate: l.pickup_date,
-        status: l.status as LoadStatus,
-      }));
+      const [postedSnap, mySnap] = await Promise.all([
+        getDocs(postedQuery),
+        getDocs(myQuery),
+      ]);
 
-      setLoads(transformedLoads);
+      const mapDoc = (d: any): Load => ({
+        id: d.id,
+        companyName: "Loading...",
+        pickupCity: d.data().pickup_city,
+        pickupState: d.data().pickup_state,
+        dropCity: d.data().drop_city,
+        dropState: d.data().drop_state,
+        material: d.data().material,
+        weight: d.data().weight,
+        truckType: d.data().truck_type,
+        price: d.data().price,
+        pickupDate: d.data().pickup_date,
+        status: d.data().status as LoadStatus,
+      });
+
+      const merged = [
+        ...postedSnap.docs.map(mapDoc),
+        ...mySnap.docs.map(mapDoc),
+      ];
+
+      // remove duplicates
+      const unique = Array.from(
+        new Map(merged.map((l) => [l.id, l])).values()
+      );
+
+      setLoads(unique);
     } catch (error: any) {
       toast({
         title: "Error fetching loads",
@@ -59,31 +91,41 @@ const DriverDashboard = () => {
 
   const handleAction = async (loadId: string, action: string) => {
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error("Not authenticated");
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+      const user = auth.currentUser;
+      if (!user) throw new Error("Not authenticated");
+
+      const loadRef = doc(db, "loads", loadId);
 
       let updates: any = {};
-      if (action === 'accept') {
-        updates = { status: 'accepted', driver_id: userData.user.id };
-      } else if (action === 'start') {
-        updates = { status: 'in_transit' };
-      } else if (action === 'deliver') {
-        updates = { status: 'delivered' };
+
+      if (action === "accept") {
+        updates = { status: "accepted", driver_id: user.uid };
+      } else if (action === "start") {
+        updates = { status: "in_transit" };
+      } else if (action === "deliver") {
+        updates = { status: "delivered" };
       }
 
-      const { error } = await supabase
-        .from('loads')
-        .update(updates)
-        .eq('id', loadId);
-
-      if (error) throw error;
+      await updateDoc(loadRef, updates);
 
       toast({
-        title: action === 'accept' ? "Load Accepted! ✅" : action === 'start' ? "Trip Started! 🚚" : "Delivered! 🎉",
-        description: action === 'accept' ? "लोड स्वीकार किया गया" : action === 'start' ? "यात्रा शुरू हो गई" : "माल पहुँचा दिया गया",
+        title:
+          action === "accept"
+            ? "Load Accepted! ✅"
+            : action === "start"
+            ? "Trip Started! 🚚"
+            : "Delivered! 🎉",
+        description:
+          action === "accept"
+            ? "लोड स्वीकार किया गया"
+            : action === "start"
+            ? "यात्रा शुरू हो गई"
+            : "माल पहुँचा दिया गया",
       });
 
-      fetchLoads(); // Refresh list
+      fetchLoads();
     } catch (error: any) {
       toast({
         title: "Action failed",
@@ -93,18 +135,25 @@ const DriverDashboard = () => {
     }
   };
 
-  const available = loads.filter((l) => l.status === 'posted');
-  const myLoads = loads.filter((l) => ['accepted', 'in_transit'].includes(l.status));
-  const delivered = loads.filter((l) => ['delivered', 'completed'].includes(l.status));
+  const available = loads.filter((l) => l.status === "posted");
+  const myLoads = loads.filter((l) =>
+    ["accepted", "in_transit"].includes(l.status)
+  );
+  const delivered = loads.filter((l) =>
+    ["delivered", "completed"].includes(l.status)
+  );
 
   return (
     <div className="min-h-screen bg-background pb-24">
       <Header />
+
       <div className="pt-20 px-4 max-w-lg mx-auto">
         {/* Greeting */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
           <h1 className="text-2xl font-bold">Namaste 🙏</h1>
-          <p className="text-sm text-muted-foreground">Find loads near you (अपने पास के लोड खोजें)</p>
+          <p className="text-sm text-muted-foreground">
+            Find loads near you (अपने पास के लोड खोजें)
+          </p>
         </motion.div>
 
         {/* Quick stats */}
@@ -112,34 +161,54 @@ const DriverDashboard = () => {
           {[
             { icon: Package, label: "Active", labelHi: "चालू", value: myLoads.length, color: "text-electric" },
             { icon: TrendingUp, label: "Done", labelHi: "पूरे", value: delivered.length, color: "text-success" },
-            { icon: IndianRupee, label: "Earned", labelHi: "कमाई", value: `₹${delivered.reduce((acc, l) => acc + (l.price || 0), 0).toLocaleString()}`, color: "text-primary" },
+            {
+              icon: IndianRupee,
+              label: "Earned",
+              labelHi: "कमाई",
+              value: `₹${delivered
+                .reduce((acc, l) => acc + (l.price || 0), 0)
+                .toLocaleString()}`,
+              color: "text-primary",
+            },
           ].map((s) => (
             <div key={s.label} className="glass rounded-xl p-3 text-center">
               <s.icon className={`w-5 h-5 mx-auto mb-1 ${s.color}`} />
               <div className="text-lg font-bold">{s.value}</div>
-              <div className="text-[10px] text-muted-foreground">{s.label} ({s.labelHi})</div>
+              <div className="text-[10px] text-muted-foreground">
+                {s.label} ({s.labelHi})
+              </div>
             </div>
           ))}
         </div>
 
-        {/* My active loads */}
+        {/* My loads */}
         {myLoads.length > 0 && (
           <section className="mb-6">
-            <h2 className="text-lg font-bold mb-3">My Loads (मेरे लोड)</h2>
+            <h2 className="text-lg font-bold mb-3">
+              My Loads (मेरे लोड)
+            </h2>
             <div className="space-y-3">
               {myLoads.map((l) => (
-                <LoadCard key={l.id} load={l} role="driver" onAction={(a) => handleAction(l.id, a)} />
+                <LoadCard
+                  key={l.id}
+                  load={l}
+                  role="driver"
+                  onAction={(a) => handleAction(l.id, a)}
+                />
               ))}
             </div>
           </section>
         )}
 
-        {/* Available loads */}
+        {/* Available */}
         <section className="mb-6">
           <h2 className="text-lg font-bold mb-3">
             Available Loads (उपलब्ध लोड)
-            <span className="ml-2 text-sm text-muted-foreground font-normal">({available.length})</span>
+            <span className="ml-2 text-sm text-muted-foreground font-normal">
+              ({available.length})
+            </span>
           </h2>
+
           {loading ? (
             <div className="glass rounded-2xl p-8 text-center animate-pulse">
               <p className="text-muted-foreground">Loading loads...</p>
@@ -147,18 +216,28 @@ const DriverDashboard = () => {
           ) : available.length === 0 ? (
             <div className="glass rounded-2xl p-8 text-center">
               <Truck className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">No loads available right now</p>
-              <p className="text-xs text-muted-foreground mt-1">(अभी कोई लोड उपलब्ध नहीं है)</p>
+              <p className="text-muted-foreground">
+                No loads available right now
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                (अभी कोई लोड उपलब्ध नहीं है)
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
               {available.map((l) => (
-                <LoadCard key={l.id} load={l} role="driver" onAction={(a) => handleAction(l.id, a)} />
+                <LoadCard
+                  key={l.id}
+                  load={l}
+                  role="driver"
+                  onAction={(a) => handleAction(l.id, a)}
+                />
               ))}
             </div>
           )}
         </section>
       </div>
+
       <BottomNav />
     </div>
   );

@@ -1,12 +1,22 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Truck, Phone, Mail, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  Truck,
+  Phone,
+  Mail,
+  ArrowRight,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+import { app } from "@/Firebase";
+import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import { getFirestore, doc, getDoc } from "firebase/firestore";
+
 const Login = () => {
-  const [method, setMethod] = useState<'phone' | 'email'>('phone');
+  const [method, setMethod] = useState<"phone" | "email">("phone");
   const [showPass, setShowPass] = useState(false);
   const navigate = useNavigate();
 
@@ -21,34 +31,40 @@ const Login = () => {
     setLoading(true);
 
     try {
-      if (method === 'email') {
-        const { data, error } = await supabase.auth.signInWithPassword({
+      if (method === "email") {
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // 🔐 Firebase login
+        const cred = await signInWithEmailAndPassword(
+          auth,
           email,
-          password,
-        });
+          password
+        );
 
-        if (error) throw error;
+        const uid = cred.user.uid;
 
-        // Fetch user profile to redirect correctly
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', data.user.id)
-          .single();
+        // 🔎 Detect role
+        const driverDoc = await getDoc(doc(db, "drivers", uid));
+        const companyDoc = await getDoc(doc(db, "companies", uid));
 
         toast({
           title: "Welcome Back! 👋",
           description: "Login successful (लॉगिन सफल रहा)",
         });
 
-        if (profile?.role === 'admin') navigate("/admin");
-        else if (profile?.role === 'company') navigate("/company");
-        else navigate("/driver");
+        if (driverDoc.exists()) {
+          navigate("/driver");
+        } else if (companyDoc.exists()) {
+          navigate("/company");
+        } else {
+          navigate("/");
+        }
       } else {
-        // Phone login - for now just simulated or use OTP
         toast({
           title: "Coming Soon! 🚀",
-          description: "Phone login with OTP will be available soon. Please use Email for now.",
+          description:
+            "Phone login with OTP will be available soon. Please use Email for now.",
         });
       }
     } catch (error: any) {
@@ -78,25 +94,37 @@ const Login = () => {
               <span className="text-gradient-gold">LOAD</span>LINK
             </span>
           </Link>
-          <h1 className="text-2xl font-bold mb-1">Welcome Back (वापस स्वागत है)</h1>
-          <p className="text-sm text-muted-foreground">Login to your account</p>
+
+          <h1 className="text-2xl font-bold mb-1">
+            Welcome Back (वापस स्वागत है)
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Login to your account
+          </p>
         </div>
 
         <div className="glass rounded-2xl p-6">
           {/* Method toggle */}
           <div className="flex gap-2 mb-6">
             <button
-              onClick={() => setMethod('phone')}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${method === 'phone' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                }`}
+              onClick={() => setMethod("phone")}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                method === "phone"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground"
+              }`}
             >
               <Phone className="w-4 h-4 inline mr-1.5" />
               Phone (फ़ोन)
             </button>
+
             <button
-              onClick={() => setMethod('email')}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${method === 'email' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                }`}
+              onClick={() => setMethod("email")}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                method === "email"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground"
+              }`}
             >
               <Mail className="w-4 h-4 inline mr-1.5" />
               Email
@@ -104,7 +132,7 @@ const Login = () => {
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
-            {method === 'phone' ? (
+            {method === "phone" ? (
               <>
                 <div>
                   <label className="text-sm font-medium mb-1.5 block">
@@ -120,32 +148,38 @@ const Login = () => {
                       maxLength={10}
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="flex-1 bg-muted rounded-r-xl px-4 py-3 text-lg outline-none focus:ring-2 ring-primary/50 transition-all"
+                      className="flex-1 bg-muted rounded-r-xl px-4 py-3 text-lg outline-none focus:ring-2 ring-primary/50"
                     />
                   </div>
                 </div>
+
                 <button
                   type="submit"
                   disabled={loading}
                   className="w-full btn-gold text-lg py-4 rounded-xl disabled:opacity-50"
                 >
                   {loading ? "Sending..." : "Send OTP (OTP भेजें)"}
-                  {!loading && <ArrowRight className="inline ml-2 w-5 h-5" />}
+                  {!loading && (
+                    <ArrowRight className="inline ml-2 w-5 h-5" />
+                  )}
                 </button>
               </>
             ) : (
               <>
                 <div>
-                  <label className="text-sm font-medium mb-1.5 block">Email</label>
+                  <label className="text-sm font-medium mb-1.5 block">
+                    Email
+                  </label>
                   <input
                     type="email"
                     placeholder="you@company.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="w-full bg-muted rounded-xl px-4 py-3 outline-none focus:ring-2 ring-primary/50 transition-all"
+                    className="w-full bg-muted rounded-xl px-4 py-3 outline-none focus:ring-2 ring-primary/50"
                   />
                 </div>
+
                 <div>
                   <label className="text-sm font-medium mb-1.5 block">
                     Password (पासवर्ड)
@@ -155,26 +189,35 @@ const Login = () => {
                       type={showPass ? "text" : "password"}
                       placeholder="••••••••"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) =>
+                        setPassword(e.target.value)
+                      }
                       required
-                      className="w-full bg-muted rounded-xl px-4 py-3 pr-10 outline-none focus:ring-2 ring-primary/50 transition-all"
+                      className="w-full bg-muted rounded-xl px-4 py-3 pr-10 outline-none focus:ring-2 ring-primary/50"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPass(!showPass)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                     >
-                      {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showPass ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
                 </div>
+
                 <button
                   type="submit"
                   disabled={loading}
                   className="w-full btn-gold text-lg py-4 rounded-xl disabled:opacity-50"
                 >
                   {loading ? "Logging in..." : "Login (लॉगिन करें)"}
-                  {!loading && <ArrowRight className="inline ml-2 w-5 h-5" />}
+                  {!loading && (
+                    <ArrowRight className="inline ml-2 w-5 h-5" />
+                  )}
                 </button>
               </>
             )}
@@ -183,7 +226,10 @@ const Login = () => {
 
         <p className="text-center text-sm text-muted-foreground mt-6">
           Don't have an account?{" "}
-          <Link to="/register" className="text-primary font-medium hover:underline">
+          <Link
+            to="/register"
+            className="text-primary font-medium hover:underline"
+          >
             Register Free (मुफ़्त रजिस्टर करें)
           </Link>
         </p>

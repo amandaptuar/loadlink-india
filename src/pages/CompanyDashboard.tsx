@@ -1,71 +1,113 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, Package, Truck, IndianRupee, TrendingUp, MapPin, ArrowRight } from "lucide-react";
+import { Plus, Package, Truck, IndianRupee, TrendingUp } from "lucide-react";
 import Header from "@/components/Header";
 import LoadCard from "@/components/LoadCard";
 import StatusTimeline from "@/components/StatusTimeline";
 import type { Load, LoadStatus } from "@/lib/types";
-import { supabase } from "@/integrations/supabase/client";
+
+import { app } from "@/Firebase";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+} from "firebase/firestore";
 
 const CompanyDashboard = () => {
   const [loads, setLoads] = useState<Load[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchCompanyLoads = async () => {
-    try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return;
-
-      const { data, error } = await supabase
-        .from('loads')
-        .select('*')
-        .eq('company_id', userData.user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      const transformedLoads: Load[] = (data || []).map((l: any) => ({
-        id: l.id,
-        companyName: "Me",
-        pickupCity: l.pickup_city,
-        pickupState: l.pickup_state,
-        dropCity: l.drop_city,
-        dropState: l.drop_state,
-        material: l.material,
-        weight: l.weight,
-        truckType: l.truck_type,
-        price: l.price,
-        pickupDate: l.pickup_date,
-        status: l.status as LoadStatus,
-      }));
-
-      setLoads(transformedLoads);
-    } catch (error: any) {
-      console.error("Error fetching company loads:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchCompanyLoads();
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let unsubscribeLoads: any = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        setLoads([]);
+        setLoading(false);
+        return;
+      }
+
+      const q = query(
+        collection(db, "loads"),
+        where("company_id", "==", user.uid),
+        orderBy("created_at", "desc")
+      );
+
+      // 🔥 REALTIME LISTENER
+      unsubscribeLoads = onSnapshot(q, (snap) => {
+        const data: Load[] = snap.docs.map((d: any) => ({
+          id: d.id,
+          companyName: "Me",
+          pickupCity: d.data().pickup_city,
+          pickupState: d.data().pickup_state,
+          dropCity: d.data().drop_city,
+          dropState: d.data().drop_state,
+          material: d.data().material,
+          weight: d.data().weight,
+          truckType: d.data().truck_type,
+          price: d.data().price,
+          pickupDate: d.data().pickup_date,
+          status: (d.data().status || "posted") as LoadStatus,
+        }));
+
+        setLoads(data);
+        setLoading(false);
+      });
+    });
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeLoads) unsubscribeLoads();
+    };
   }, []);
 
-  const active = loads.filter((l) => !['delivered', 'completed'].includes(l.status));
-  const completed = loads.filter((l) => ['delivered', 'completed'].includes(l.status));
+  // ✅ Correct categories
+  const available = loads.filter(
+    (l) => !["delivered", "completed"].includes(l.status)
+  );
+
+  const active = loads.filter((l) =>
+    ["accepted", "in_transit"].includes(l.status)
+  );
+
+  const completed = loads.filter((l) =>
+    ["delivered", "completed"].includes(l.status)
+  );
+
+  const trucksAssigned = active.length;
+  const totalSpent = completed.reduce(
+    (acc, l) => acc + (l.price || 0),
+    0
+  );
 
   return (
     <div className="min-h-screen bg-background pb-10">
       <Header />
+
       <div className="pt-20 px-4 max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold">Dashboard (डैशबोर्ड)</h1>
-            <p className="text-sm text-muted-foreground">Your Company</p>
+            <h1 className="text-2xl font-bold">
+              Dashboard (डैशबोर्ड)
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Your Company
+            </p>
           </div>
-          <Link to="/company/post-load" className="btn-gold flex items-center gap-2 py-2.5 px-5">
+
+          <Link
+            to="/company/post-load"
+            className="btn-gold flex items-center gap-2 py-2.5 px-5"
+          >
             <Plus className="w-5 h-5" />
             Post Load
           </Link>
@@ -74,10 +116,30 @@ const CompanyDashboard = () => {
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
           {[
-            { icon: Package, label: "Active Loads", labelHi: "चालू लोड", value: active.length, color: "text-electric" },
-            { icon: Truck, label: "Trucks Assigned", labelHi: "ट्रक लगे", value: 0, color: "text-success" },
-            { icon: IndianRupee, label: "Total Spent", labelHi: "कुल खर्च", value: "₹0", color: "text-primary" },
-            { icon: TrendingUp, label: "Completed", labelHi: "पूरे हुए", value: completed.length, color: "text-gold-dim" },
+            {
+              icon: Package,
+              label: "Available",
+              value: available.length,
+              color: "text-electric",
+            },
+            {
+              icon: Truck,
+              label: "Active",
+              value: trucksAssigned,
+              color: "text-success",
+            },
+            {
+              icon: IndianRupee,
+              label: "Spent",
+              value: `₹${totalSpent.toLocaleString()}`,
+              color: "text-primary",
+            },
+            {
+              icon: TrendingUp,
+              label: "Completed",
+              value: completed.length,
+              color: "text-gold-dim",
+            },
           ].map((s) => (
             <motion.div
               key={s.label}
@@ -90,30 +152,56 @@ const CompanyDashboard = () => {
                   <s.icon className={`w-5 h-5 ${s.color}`} />
                 </div>
                 <div>
-                  <div className="text-xl font-bold">{s.value}</div>
-                  <div className="text-xs text-muted-foreground">{s.label}</div>
+                  <div className="text-xl font-bold">
+                    {s.value}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {s.label}
+                  </div>
                 </div>
               </div>
             </motion.div>
           ))}
         </div>
 
-        {/* Active loads */}
+        {/* AVAILABLE LOADS */}
         <section className="mb-8">
-          <h2 className="text-lg font-bold mb-4">Active Loads (चालू लोड)</h2>
+          <h2 className="text-lg font-bold mb-4">
+            Available Loads (उपलब्ध लोड)
+          </h2>
+
           {loading ? (
             <div className="glass rounded-2xl p-8 text-center animate-pulse">
-              <p className="text-muted-foreground">Loading loads...</p>
+              Loading loads...
             </div>
-          ) : active.length === 0 ? (
+          ) : available.length === 0 ? (
             <div className="glass rounded-2xl p-8 text-center">
               <Package className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">No active loads</p>
-              <Link to="/company/post-load" className="text-primary hover:underline font-medium block mt-2">
-                Post your first load (अपना पहला लोड पोस्ट करें)
+              <p className="text-muted-foreground">
+                No loads posted yet
+              </p>
+              <Link
+                to="/company/post-load"
+                className="text-primary hover:underline font-medium block mt-2"
+              >
+                Post your first load
               </Link>
             </div>
           ) : (
+            <div className="grid md:grid-cols-2 gap-4">
+              {available.map((l) => (
+                <LoadCard key={l.id} load={l} role="company" />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* ACTIVE */}
+        {active.length > 0 && (
+          <section className="mb-8">
+            <h2 className="text-lg font-bold mb-4">
+              Active Loads (चालू लोड)
+            </h2>
             <div className="grid md:grid-cols-2 gap-4">
               {active.map((l) => (
                 <div key={l.id} className="space-y-3">
@@ -122,13 +210,15 @@ const CompanyDashboard = () => {
                 </div>
               ))}
             </div>
-          )}
-        </section>
+          </section>
+        )}
 
-        {/* Completed */}
+        {/* COMPLETED */}
         {completed.length > 0 && (
           <section>
-            <h2 className="text-lg font-bold mb-4">Completed (पूरे हुए)</h2>
+            <h2 className="text-lg font-bold mb-4">
+              Completed (पूरे हुए)
+            </h2>
             <div className="grid md:grid-cols-2 gap-4">
               {completed.map((l) => (
                 <LoadCard key={l.id} load={l} role="company" />

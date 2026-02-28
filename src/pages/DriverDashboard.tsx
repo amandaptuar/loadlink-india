@@ -6,6 +6,7 @@ import BottomNav from "@/components/BottomNav";
 import LoadCard from "@/components/LoadCard";
 import type { Load, LoadStatus } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 import { app } from "@/Firebase";
 import { getAuth } from "firebase/auth";
@@ -19,25 +20,33 @@ import {
   updateDoc,
 } from "firebase/firestore";
 
+const CACHE_KEY = "driver_loads_cache";
+
 const DriverDashboard = () => {
   const [loads, setLoads] = useState<Load[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const fetchLoads = async () => {
     try {
       const auth = getAuth(app);
       const db = getFirestore(app);
       const user = auth.currentUser;
-      if (!user) return;
 
-      // 🔎 Get posted loads
+      if (!user) {
+        const hasCache = localStorage.getItem(CACHE_KEY);
+        if (!hasCache) navigate("/");
+        return;
+      }
+
+      // 🔎 posted loads
       const postedQuery = query(
         collection(db, "loads"),
         where("status", "==", "posted")
       );
 
-      // 🔎 Get driver loads
+      // 🔎 my loads
       const myQuery = query(
         collection(db, "loads"),
         where("driver_id", "==", user.uid)
@@ -68,12 +77,14 @@ const DriverDashboard = () => {
         ...mySnap.docs.map(mapDoc),
       ];
 
-      // remove duplicates
       const unique = Array.from(
         new Map(merged.map((l) => [l.id, l])).values()
       );
 
       setLoads(unique);
+
+      // ✅ update cache
+      localStorage.setItem(CACHE_KEY, JSON.stringify(unique));
     } catch (error: any) {
       toast({
         title: "Error fetching loads",
@@ -86,6 +97,16 @@ const DriverDashboard = () => {
   };
 
   useEffect(() => {
+    // ✅ restore cache instantly
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      try {
+        const parsed: Load[] = JSON.parse(cached);
+        setLoads(parsed);
+        setLoading(false);
+      } catch {}
+    }
+
     fetchLoads();
   }, []);
 
@@ -125,6 +146,7 @@ const DriverDashboard = () => {
             : "माल पहुँचा दिया गया",
       });
 
+      // 🔄 refetch + cache refresh
       fetchLoads();
     } catch (error: any) {
       toast({
@@ -148,7 +170,6 @@ const DriverDashboard = () => {
       <Header />
 
       <div className="pt-20 px-4 max-w-lg mx-auto">
-        {/* Greeting */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
           <h1 className="text-2xl font-bold">Namaste 🙏</h1>
           <p className="text-sm text-muted-foreground">
@@ -156,7 +177,6 @@ const DriverDashboard = () => {
           </p>
         </motion.div>
 
-        {/* Quick stats */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           {[
             { icon: Package, label: "Active", labelHi: "चालू", value: myLoads.length, color: "text-electric" },
@@ -165,9 +185,7 @@ const DriverDashboard = () => {
               icon: IndianRupee,
               label: "Earned",
               labelHi: "कमाई",
-              value: `₹${delivered
-                .reduce((acc, l) => acc + (l.price || 0), 0)
-                .toLocaleString()}`,
+              value: `₹${delivered.reduce((acc, l) => acc + (l.price || 0), 0).toLocaleString()}`,
               color: "text-primary",
             },
           ].map((s) => (
@@ -181,7 +199,6 @@ const DriverDashboard = () => {
           ))}
         </div>
 
-        {/* My loads */}
         {myLoads.length > 0 && (
           <section className="mb-6">
             <h2 className="text-lg font-bold mb-3">
@@ -200,7 +217,6 @@ const DriverDashboard = () => {
           </section>
         )}
 
-        {/* Available */}
         <section className="mb-6">
           <h2 className="text-lg font-bold mb-3">
             Available Loads (उपलब्ध लोड)

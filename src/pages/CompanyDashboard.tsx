@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Plus, Package, Truck, IndianRupee, TrendingUp } from "lucide-react";
 import Header from "@/components/Header";
@@ -18,19 +18,36 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 
+const CACHE_KEY = "company_loads_cache";
+
 const CompanyDashboard = () => {
   const [loads, setLoads] = useState<Load[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const auth = getAuth(app);
     const db = getFirestore(app);
 
+    // ✅ STEP 1: restore cache on refresh
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      try {
+        const parsed: Load[] = JSON.parse(cached);
+        setLoads(parsed);
+        setLoading(false);
+      } catch {}
+    }
+
     let unsubscribeLoads: any = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      // ❌ no user + no cache → go home
       if (!user) {
-        setLoads([]);
+        const hasCache = localStorage.getItem(CACHE_KEY);
+        if (!hasCache) {
+          navigate("/");
+        }
         setLoading(false);
         return;
       }
@@ -41,7 +58,6 @@ const CompanyDashboard = () => {
         orderBy("created_at", "desc")
       );
 
-      // 🔥 REALTIME LISTENER
       unsubscribeLoads = onSnapshot(q, (snap) => {
         const data: Load[] = snap.docs.map((d: any) => ({
           id: d.id,
@@ -60,6 +76,9 @@ const CompanyDashboard = () => {
 
         setLoads(data);
         setLoading(false);
+
+        // ✅ STEP 2: update cache
+        localStorage.setItem(CACHE_KEY, JSON.stringify(data));
       });
     });
 
@@ -67,9 +86,9 @@ const CompanyDashboard = () => {
       unsubscribeAuth();
       if (unsubscribeLoads) unsubscribeLoads();
     };
-  }, []);
+  }, [navigate]);
 
-  // ✅ Correct categories
+  // categories
   const available = loads.filter(
     (l) => !["delivered", "completed"].includes(l.status)
   );
@@ -83,10 +102,7 @@ const CompanyDashboard = () => {
   );
 
   const trucksAssigned = active.length;
-  const totalSpent = completed.reduce(
-    (acc, l) => acc + (l.price || 0),
-    0
-  );
+  const totalSpent = completed.reduce((acc, l) => acc + (l.price || 0), 0);
 
   return (
     <div className="min-h-screen bg-background pb-10">
@@ -96,12 +112,8 @@ const CompanyDashboard = () => {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold">
-              Dashboard (डैशबोर्ड)
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Your Company
-            </p>
+            <h1 className="text-2xl font-bold">Dashboard (डैशबोर्ड)</h1>
+            <p className="text-sm text-muted-foreground">Your Company</p>
           </div>
 
           <Link
@@ -152,9 +164,7 @@ const CompanyDashboard = () => {
                   <s.icon className={`w-5 h-5 ${s.color}`} />
                 </div>
                 <div>
-                  <div className="text-xl font-bold">
-                    {s.value}
-                  </div>
+                  <div className="text-xl font-bold">{s.value}</div>
                   <div className="text-xs text-muted-foreground">
                     {s.label}
                   </div>
@@ -164,7 +174,7 @@ const CompanyDashboard = () => {
           ))}
         </div>
 
-        {/* AVAILABLE LOADS */}
+        {/* AVAILABLE */}
         <section className="mb-8">
           <h2 className="text-lg font-bold mb-4">
             Available Loads (उपलब्ध लोड)
